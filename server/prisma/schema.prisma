@@ -1,0 +1,331 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  ANALYST
+  VIEWER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FindingStatus {
+  OPEN
+  IN_ANALYSIS
+  ACTION_DEFINED
+  IN_EXECUTION
+  PENDING_VERIFICATION
+  CLOSED
+  REOPENED
+}
+
+enum NonConformityStatus {
+  OPEN
+  IN_TREATMENT
+  CLOSED
+}
+
+enum RiskStatus {
+  IDENTIFIED
+  ASSESSED
+  IN_TREATMENT
+  MONITORED
+  CLOSED
+}
+
+enum OpportunityStatus {
+  IDENTIFIED
+  EVALUATED
+  IN_PROGRESS
+  IMPLEMENTED
+  CLOSED
+}
+
+enum ActionType {
+  CORRECTIVE
+  PREVENTIVE
+  IMPROVEMENT
+}
+
+enum ActionStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  VERIFIED
+  CANCELLED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum ProcedureStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  OBSOLETE
+}
+
+enum KpiFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String
+  passwordHash String
+  role         Role       @default(ANALYST)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  activities   Activity[]
+  auditLogs    AuditLog[]
+}
+
+model Department {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  processes   Process[]
+  activities  Activity[]
+}
+
+model Process {
+  id              String          @id @default(cuid())
+  name            String
+  description     String?
+  departmentId    String
+  department      Department      @relation(fields: [departmentId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  procedures      Procedure[]
+  findings        Finding[]
+  nonConformities NonConformity[]
+  risks           Risk[]
+  opportunities   Opportunity[]
+  tasks           Task[]
+  activities      Activity[]
+  kpis            Kpi[]
+
+  @@unique([departmentId, name])
+  @@index([departmentId])
+}
+
+model Procedure {
+  id          String          @id @default(cuid())
+  code        String?
+  title       String
+  content     String?
+  version     String          @default("1.0")
+  status      ProcedureStatus @default(DRAFT)
+  processId   String
+  process     Process         @relation(fields: [processId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([processId])
+}
+
+model Finding {
+  id            String        @id @default(cuid())
+  code          String?       @unique
+  title         String
+  description   String?
+  type          String        @default("AUDIT")
+  priority      Priority      @default(MEDIUM)
+  status        FindingStatus @default(OPEN)
+  cause         String?
+  evidence      String?
+  dueDate       DateTime?
+  closedAt      DateTime?
+  processId     String
+  process       Process       @relation(fields: [processId], references: [id])
+  responsibleId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  actions       Action[]
+
+  @@index([processId])
+  @@index([status])
+}
+
+model NonConformity {
+  id            String             @id @default(cuid())
+  code          String?            @unique
+  title         String
+  description   String?
+  requirement   String?
+  status        NonConformityStatus @default(OPEN)
+  processId     String
+  process       Process            @relation(fields: [processId], references: [id])
+  responsibleId String?
+  detectedAt    DateTime           @default(now())
+  closedAt      DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  actions       Action[]
+
+  @@index([processId])
+  @@index([status])
+}
+
+model Risk {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  probability   Int        @default(1)
+  impact        Int        @default(1)
+  level         Int        @default(1)
+  status        RiskStatus @default(IDENTIFIED)
+  mitigation    String?
+  processId     String
+  process       Process    @relation(fields: [processId], references: [id])
+  responsibleId String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  actions       Action[]
+
+  @@index([processId])
+  @@index([status])
+}
+
+model Opportunity {
+  id            String            @id @default(cuid())
+  title         String
+  description   String?
+  benefit       String?
+  status        OpportunityStatus @default(IDENTIFIED)
+  processId     String
+  process       Process           @relation(fields: [processId], references: [id])
+  responsibleId String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  actions       Action[]
+
+  @@index([processId])
+  @@index([status])
+}
+
+model Action {
+  id               String         @id @default(cuid())
+  title            String
+  description      String?
+  type             ActionType     @default(CORRECTIVE)
+  status           ActionStatus   @default(PENDING)
+  dueDate          DateTime?
+  completedAt      DateTime?
+  findingId        String?
+  finding          Finding?       @relation(fields: [findingId], references: [id])
+  nonConformityId  String?
+  nonConformity    NonConformity? @relation(fields: [nonConformityId], references: [id])
+  riskId           String?
+  risk             Risk?          @relation(fields: [riskId], references: [id])
+  opportunityId    String?
+  opportunity      Opportunity?   @relation(fields: [opportunityId], references: [id])
+  responsibleId    String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  tasks            Task[]
+
+  @@index([status])
+}
+
+model Task {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  status        TaskStatus @default(PENDING)
+  priority      Priority   @default(MEDIUM)
+  dueDate       DateTime?
+  completedAt   DateTime?
+  actionId      String?
+  action        Action?    @relation(fields: [actionId], references: [id])
+  processId     String?
+  process       Process?   @relation(fields: [processId], references: [id])
+  responsibleId String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([status])
+  @@index([actionId])
+}
+
+model Activity {
+  id           String      @id @default(cuid())
+  title        String
+  description  String?
+  date         DateTime    @default(now())
+  processId    String?
+  process      Process?    @relation(fields: [processId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([date])
+}
+
+model Kpi {
+  id            String       @id @default(cuid())
+  name          String
+  description   String?
+  formula       String?
+  unit          String       @default("%")
+  target        Float
+  frequency     KpiFrequency @default(MONTHLY)
+  processId     String
+  process       Process      @relation(fields: [processId], references: [id])
+  responsibleId String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  values        KpiValue[]
+
+  @@index([processId])
+}
+
+model KpiValue {
+  id        String   @id @default(cuid())
+  kpiId     String
+  kpi       Kpi      @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  value     Float
+  period    String
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@unique([kpiId, period])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  entity    String
+  entityId  String
+  action    String
+  changes   Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}
