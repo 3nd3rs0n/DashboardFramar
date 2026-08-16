@@ -15,7 +15,8 @@ export const createProcedureBody = z.object({
   content: z.string().optional(),
   version: z.string().default('1.0'),
   status: z.enum(ProcedureStatus).default('DRAFT'),
-  processId: z.string().min(1),
+  departmentId: z.string().min(1),
+  processName: z.string().min(1),
 });
 export type CreateProcedureBody = z.infer<typeof createProcedureBody>;
 

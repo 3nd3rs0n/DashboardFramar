@@ -16,7 +16,6 @@ import {
   ShieldAlert,
   SquareCheck,
   Users,
-  Workflow,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -43,7 +42,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Panel Principal', icon: LayoutDashboard, end: true },
   { to: '/departments', label: 'Departamentos', icon: Building2 },
-  { to: '/processes', label: 'Procesos', icon: Workflow },
   { to: '/procedures', label: 'Procedimientos', icon: FileText },
   { to: '/findings', label: 'Hallazgos', icon: FileSearch },
   { to: '/non-conformities', label: 'No Conformidades', icon: OctagonAlert },

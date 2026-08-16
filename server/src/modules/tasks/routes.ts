@@ -1,10 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { registerCrud } from '../../lib/crud.js';
+import { crudController } from '../../lib/controller.js';
 import { createTaskBody, listTasksQuery, updateTaskBody } from './schemas.js';
 import { taskService } from './service.js';
 
 export const taskRoutes: FastifyPluginAsync = async (app) => {
-  registerCrud(app, {
+  crudController({
+    app,
     entity: 'Task',
     tag: 'tasks',
     listQuery: listTasksQuery,

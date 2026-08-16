@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { registerCrud } from '../../lib/crud.js';
+import { crudController } from '../../lib/controller.js';
 import {
   createOpportunityBody,
   listOpportunitiesQuery,
@@ -8,7 +8,8 @@ import {
 import { opportunityService } from './service.js';
 
 export const opportunityRoutes: FastifyPluginAsync = async (app) => {
-  registerCrud(app, {
+  crudController({
+    app,
     entity: 'Opportunity',
     tag: 'opportunities',
     listQuery: listOpportunitiesQuery,

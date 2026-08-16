@@ -140,10 +140,22 @@ model Procedure {
   status      ProcedureStatus @default(DRAFT)
   processId   String
   process     Process         @relation(fields: [processId], references: [id])
+  file        File?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
   @@index([processId])
+}
+
+model File {
+  id          String   @id @default(cuid())
+  filename    String
+  mimetype    String
+  size        Int
+  data        Bytes
+  procedureId String   @unique
+  procedure   Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
 }
 
 model Finding {

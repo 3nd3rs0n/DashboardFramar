@@ -66,6 +66,14 @@ export interface Process {
   createdAt: string
 }
 
+export interface ProcedureFile {
+  id: string
+  filename: string
+  mimetype: string
+  size: number
+  createdAt: string
+}
+
 export interface Procedure {
   id: string
   code: string | null
@@ -75,6 +83,7 @@ export interface Procedure {
   status: ProcedureStatus
   processId: string
   process?: Process
+  file?: ProcedureFile | null
   createdAt: string
 }
 

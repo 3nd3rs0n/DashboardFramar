@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { registerCrud } from '../../lib/crud.js';
+import { crudController } from '../../lib/controller.js';
 import {
   createNonConformityBody,
   listNonConformitiesQuery,
@@ -8,7 +8,8 @@ import {
 import { nonConformityService } from './service.js';
 
 export const nonConformityRoutes: FastifyPluginAsync = async (app) => {
-  registerCrud(app, {
+  crudController({
+    app,
     entity: 'NonConformity',
     tag: 'non-conformities',
     listQuery: listNonConformitiesQuery,

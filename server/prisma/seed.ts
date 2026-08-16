@@ -32,7 +32,7 @@ async function main() {
   }
   console.log(`  Departments: ${Object.keys(depts).length}`)
 
-  // Processes (2 per dept, skip for brevity — pick representative ones)
+  // Processes
   const processData = [
     { name: 'Contratación', dept: 'Recursos Humanos' },
     { name: 'Nómina', dept: 'Recursos Humanos' },
@@ -64,13 +64,12 @@ async function main() {
     { title: 'Proceso de facturación', code: 'PR-004', process: 'Cuentas por cobrar' },
   ]
   for (const pd of procData) {
-    await prisma.procedure.upsert({
-      where: { id: pd.code },
-      update: {},
-      create: { code: pd.code, title: pd.title, processId: processes[pd.process].id, version: '1.0', status: 'APPROVED' },
-    }).catch(() =>
-      prisma.procedure.create({ data: { code: pd.code, title: pd.title, processId: processes[pd.process].id, version: '1.0', status: 'APPROVED' } }),
-    )
+    const existing = await prisma.procedure.findFirst({ where: { code: pd.code } })
+    if (!existing) {
+      await prisma.procedure.create({
+        data: { code: pd.code, title: pd.title, processId: processes[pd.process].id, version: '1.0', status: 'APPROVED' },
+      })
+    }
   }
   console.log(`  Procedures: ${procData.length}`)
 
@@ -84,8 +83,10 @@ async function main() {
     { title: 'Sin plan de contingencia TI', code: 'H-006', priority: 'HIGH', status: 'OPEN', process: 'Infraestructura TI' },
   ]
   for (const f of findings) {
-    await prisma.finding.create({
-      data: {
+    await prisma.finding.upsert({
+      where: { code: f.code },
+      update: {},
+      create: {
         title: f.title,
         code: f.code,
         priority: f.priority as Priority,
@@ -103,9 +104,12 @@ async function main() {
     { title: 'Incumplimiento de política de seguridad', process: 'Infraestructura TI' },
   ]
   for (const nc of ncs) {
-    await prisma.nonConformity.create({
-      data: { title: nc.title, status: 'OPEN', processId: processes[nc.process].id },
-    })
+    const existing = await prisma.nonConformity.findFirst({ where: { title: nc.title } })
+    if (!existing) {
+      await prisma.nonConformity.create({
+        data: { title: nc.title, status: 'OPEN', processId: processes[nc.process].id },
+      })
+    }
   }
   console.log(`  NonConformities: ${ncs.length}`)
 
@@ -117,15 +121,18 @@ async function main() {
     { title: 'Incumplimiento regulatorio', probability: 2, impact: 4, process: 'Gestión de riesgos' },
   ]
   for (const r of risks) {
-    await prisma.risk.create({
-      data: {
-        title: r.title,
-        probability: r.probability,
-        impact: r.impact,
-        level: r.probability * r.impact,
-        processId: processes[r.process].id,
-      },
-    })
+    const existing = await prisma.risk.findFirst({ where: { title: r.title } })
+    if (!existing) {
+      await prisma.risk.create({
+        data: {
+          title: r.title,
+          probability: r.probability,
+          impact: r.impact,
+          level: r.probability * r.impact,
+          processId: processes[r.process].id,
+        },
+      })
+    }
   }
   console.log(`  Risks: ${risks.length}`)
 
@@ -136,9 +143,12 @@ async function main() {
     { title: 'Implementar sistema de ticketing TI', process: 'Infraestructura TI' },
   ]
   for (const o of opps) {
-    await prisma.opportunity.create({
-      data: { title: o.title, processId: processes[o.process].id },
-    })
+    const existing = await prisma.opportunity.findFirst({ where: { title: o.title } })
+    if (!existing) {
+      await prisma.opportunity.create({
+        data: { title: o.title, processId: processes[o.process].id },
+      })
+    }
   }
   console.log(`  Opportunities: ${opps.length}`)
 
@@ -152,38 +162,65 @@ async function main() {
     { title: 'Registrar historial de mantenimiento', type: 'CORRECTIVE', findingCode: 'H-005' },
   ]
   for (const a of actions) {
-    await prisma.action.create({
-      data: {
-        title: a.title,
-        type: a.type as ActionType,
-        status: 'PENDING',
-        findingId: findingMap[a.findingCode]?.id,
-        dueDate: new Date(2026, 9, 15),
-      },
-    })
+    const existing = await prisma.action.findFirst({ where: { title: a.title } })
+    if (!existing) {
+      await prisma.action.create({
+        data: {
+          title: a.title,
+          type: a.type as ActionType,
+          status: 'PENDING',
+          findingId: findingMap[a.findingCode]?.id,
+          dueDate: new Date(2026, 9, 15),
+        },
+      })
+    }
   }
   console.log(`  Actions: ${actions.length}`)
 
   // Tasks
-  await prisma.task.createMany({
-    data: [
-      { title: 'Redactar documento de procedimiento de selección', status: 'PENDING', priority: 'HIGH', processId: processes['Contratación'].id, dueDate: new Date(2026, 8, 20) },
-      { title: 'Revisar cálculos nómina julio', status: 'IN_PROGRESS', priority: 'MEDIUM', processId: processes['Nómina'].id, dueDate: new Date(2026, 8, 25) },
-      { title: 'Levantar inventario de activos TI', status: 'PENDING', priority: 'HIGH', processId: processes['Infraestructura TI'].id, dueDate: new Date(2026, 9, 1) },
-      { title: 'Actualizar matriz de riesgos', status: 'DONE', priority: 'MEDIUM', processId: processes['Gestión de riesgos'].id, dueDate: new Date(2026, 7, 15) },
-    ],
-  })
-  console.log('  Tasks: 4')
+  const tasksData = [
+    { title: 'Redactar documento de procedimiento de selección', status: 'PENDING' as const, priority: 'HIGH' as const, processName: 'Contratación', dueDate: new Date(2026, 8, 20) },
+    { title: 'Revisar cálculos nómina julio', status: 'IN_PROGRESS' as const, priority: 'MEDIUM' as const, processName: 'Nómina', dueDate: new Date(2026, 8, 25) },
+    { title: 'Levantar inventario de activos TI', status: 'PENDING' as const, priority: 'HIGH' as const, processName: 'Infraestructura TI', dueDate: new Date(2026, 9, 1) },
+    { title: 'Actualizar matriz de riesgos', status: 'DONE' as const, priority: 'MEDIUM' as const, processName: 'Gestión de riesgos', dueDate: new Date(2026, 7, 15) },
+  ]
+  for (const t of tasksData) {
+    const existing = await prisma.task.findFirst({ where: { title: t.title } })
+    if (!existing) {
+      await prisma.task.create({
+        data: {
+          title: t.title,
+          status: t.status,
+          priority: t.priority,
+          processId: processes[t.processName].id,
+          dueDate: t.dueDate,
+        },
+      })
+    }
+  }
+  console.log(`  Tasks: ${tasksData.length}`)
 
   // Activities
-  await prisma.activity.createMany({
-    data: [
-      { title: 'Visita a departamento de RRHH', date: new Date(2026, 7, 10), departmentId: depts['Recursos Humanos'].id, processId: processes['Contratación'].id, userId: admin.id },
-      { title: 'Revisión de documentación financiera', date: new Date(2026, 7, 11), departmentId: depts['Finanzas'].id, processId: processes['Presupuesto'].id, userId: admin.id },
-      { title: 'Inspección de infraestructura TI', date: new Date(2026, 7, 12), departmentId: depts['Tecnología / IT'].id, processId: processes['Infraestructura TI'].id, userId: admin.id },
-    ],
-  })
-  console.log('  Activities: 3')
+  const activitiesData = [
+    { title: 'Visita a departamento de RRHH', date: new Date(2026, 7, 10), deptName: 'Recursos Humanos', processName: 'Contratación' },
+    { title: 'Revisión de documentación financiera', date: new Date(2026, 7, 11), deptName: 'Finanzas', processName: 'Presupuesto' },
+    { title: 'Inspección de infraestructura TI', date: new Date(2026, 7, 12), deptName: 'Tecnología / IT', processName: 'Infraestructura TI' },
+  ]
+  for (const a of activitiesData) {
+    const existing = await prisma.activity.findFirst({ where: { title: a.title } })
+    if (!existing) {
+      await prisma.activity.create({
+        data: {
+          title: a.title,
+          date: a.date,
+          departmentId: depts[a.deptName].id,
+          processId: processes[a.processName].id,
+          userId: admin.id,
+        },
+      })
+    }
+  }
+  console.log(`  Activities: ${activitiesData.length}`)
 
   // KPIs with values (6 months)
   const kpiDefs = [
@@ -202,20 +239,28 @@ async function main() {
   }
 
   for (const kd of kpiDefs) {
-    const kpi = await prisma.kpi.create({
-      data: {
-        name: kd.name,
-        unit: kd.unit,
-        target: kd.target,
-        frequency: kd.frequency as KpiFrequency,
-        processId: processes[kd.process].id,
-        formula: kd.formula,
-      },
-    })
+    const existing = await prisma.kpi.findFirst({ where: { name: kd.name } })
+    let kpi
+    if (!existing) {
+      kpi = await prisma.kpi.create({
+        data: {
+          name: kd.name,
+          unit: kd.unit,
+          target: kd.target,
+          frequency: kd.frequency as KpiFrequency,
+          processId: processes[kd.process].id,
+          formula: kd.formula,
+        },
+      })
+    } else {
+      kpi = existing
+    }
     const vals = kpiValues[kd.name] ?? []
     for (let i = 0; i < months.length; i++) {
-      await prisma.kpiValue.create({
-        data: { kpiId: kpi.id, value: vals[i] ?? 0, period: months[i], date: new Date(`${months[i]}-15`) },
+      await prisma.kpiValue.upsert({
+        where: { kpiId_period: { kpiId: kpi.id, period: months[i] } },
+        update: { value: vals[i] ?? 0 },
+        create: { kpiId: kpi.id, value: vals[i] ?? 0, period: months[i], date: new Date(`${months[i]}-15`) },
       })
     }
   }

@@ -6,7 +6,6 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { DepartmentsPage } from '@/pages/DepartmentsPage'
-import { ProcessesPage } from '@/pages/ProcessesPage'
 import { ProceduresPage } from '@/pages/ProceduresPage'
 import { FindingsPage } from '@/pages/FindingsPage'
 import { NonConformitiesPage } from '@/pages/NonConformitiesPage'
@@ -39,7 +38,6 @@ export default function App() {
             >
               <Route path="/" element={<DashboardPage />} />
               <Route path="/departments" element={<DepartmentsPage />} />
-              <Route path="/processes" element={<ProcessesPage />} />
               <Route path="/procedures" element={<ProceduresPage />} />
               <Route path="/findings" element={<FindingsPage />} />
               <Route path="/non-conformities" element={<NonConformitiesPage />} />

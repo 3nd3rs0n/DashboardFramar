@@ -99,7 +99,7 @@ interface TitledEntity {
 }
 
 export function useRelationOptions(kind: RelationKind): Option[] {
-  const query = useList<TitledEntity>(kind, { limit: 200 })
+  const query = useList<TitledEntity>(kind, { limit: 100 })
   return (query.data?.data ?? []).map((item) => {
     const base = item.title ?? item.name ?? item.id
     const context = item.process?.department?.name ?? item.department?.name

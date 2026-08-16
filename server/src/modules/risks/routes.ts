@@ -1,10 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { registerCrud } from '../../lib/crud.js';
+import { crudController } from '../../lib/controller.js';
 import { createRiskBody, listRisksQuery, updateRiskBody } from './schemas.js';
 import { riskService } from './service.js';
 
 export const riskRoutes: FastifyPluginAsync = async (app) => {
-  registerCrud(app, {
+  crudController({
+    app,
     entity: 'Risk',
     tag: 'risks',
     listQuery: listRisksQuery,

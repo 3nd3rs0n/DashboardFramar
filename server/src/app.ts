@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import Fastify from 'fastify';
@@ -13,6 +14,7 @@ import { actionRoutes } from './modules/actions/routes.js';
 import { activityRoutes } from './modules/activities/routes.js';
 import { dashboardRoutes } from './modules/dashboard/routes.js';
 import { departmentRoutes } from './modules/departments/routes.js';
+import { fileRoutes, filePublicRoutes } from './modules/files/routes.js';
 import { findingRoutes } from './modules/findings/routes.js';
 import { kpiRoutes } from './modules/kpis/routes.js';
 import { nonConformityRoutes } from './modules/non-conformities/routes.js';
@@ -30,6 +32,7 @@ export async function buildApp() {
   app.setSerializerCompiler(serializerCompiler);
 
   await app.register(cors, { origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173' });
+  await app.register(multipart);
   await app.register(swagger, {
     openapi: {
       info: { title: 'Enterprise Audit Dashboard API', version: '1.0.0' },
@@ -53,6 +56,7 @@ export async function buildApp() {
   );
 
   await app.register(authPublicRoutes, { prefix: '/api/auth' });
+  await app.register(filePublicRoutes, { prefix: '/api/files' });
 
   await app.register(
     async (api) => {
@@ -69,6 +73,7 @@ export async function buildApp() {
       await api.register(taskRoutes, { prefix: '/tasks' });
       await api.register(activityRoutes, { prefix: '/activities' });
       await api.register(kpiRoutes, { prefix: '/kpis' });
+      await api.register(fileRoutes, { prefix: '/files' });
       await api.register(dashboardRoutes, { prefix: '/dashboard' });
     },
     { prefix: '/api' },

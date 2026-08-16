@@ -6,7 +6,24 @@ import type {
   UpdateProcedureBody,
 } from './schemas.js';
 
-const include = { process: { include: { department: true } } } satisfies Prisma.ProcedureInclude;
+const include = {
+  process: { include: { department: true } },
+  file: { select: { id: true, filename: true, mimetype: true, size: true, createdAt: true } },
+} satisfies Prisma.ProcedureInclude;
+
+async function findOrCreateProcess(
+  prisma: PrismaClient,
+  departmentId: string,
+  processName: string,
+) {
+  const existing = await prisma.process.findFirst({
+    where: { departmentId, name: processName },
+  });
+  if (existing) return existing;
+  return prisma.process.create({
+    data: { name: processName, departmentId },
+  });
+}
 
 export function procedureService(prisma: PrismaClient) {
   return {
@@ -17,6 +34,8 @@ export function procedureService(prisma: PrismaClient) {
               OR: [
                 { title: { contains: q.search, mode: 'insensitive' } },
                 { code: { contains: q.search, mode: 'insensitive' } },
+                { process: { name: { contains: q.search, mode: 'insensitive' } } },
+                { process: { department: { name: { contains: q.search, mode: 'insensitive' } } } },
               ],
             }
           : {}),
@@ -32,9 +51,49 @@ export function procedureService(prisma: PrismaClient) {
       return { data, total };
     },
     get: (id: string) => prisma.procedure.findUnique({ where: { id }, include }),
-    create: (data: CreateProcedureBody) => prisma.procedure.create({ data, include }),
-    update: (id: string, data: UpdateProcedureBody) =>
-      prisma.procedure.update({ where: { id }, data, include }),
+    async create(data: CreateProcedureBody) {
+      const process = await findOrCreateProcess(prisma, data.departmentId, data.processName);
+      return prisma.procedure.create({
+        data: {
+          code: data.code,
+          title: data.title,
+          content: data.content,
+          version: data.version,
+          status: data.status,
+          processId: process.id,
+        },
+        include,
+      });
+    },
+    async update(id: string, data: UpdateProcedureBody) {
+      const existing = await prisma.procedure.findUnique({ where: { id } });
+      if (!existing) throw new Error('Procedure not found');
+
+      let processId = existing.processId;
+      if (data.departmentId && data.processName) {
+        const process = await findOrCreateProcess(prisma, data.departmentId, data.processName);
+        processId = process.id;
+      } else if (data.processName) {
+        const current = await prisma.process.findUnique({ where: { id: existing.processId } });
+        if (current && data.processName !== current.name) {
+          const process = await findOrCreateProcess(prisma, current.departmentId, data.processName);
+          processId = process.id;
+        }
+      }
+
+      return prisma.procedure.update({
+        where: { id },
+        data: {
+          ...(data.code !== undefined ? { code: data.code } : {}),
+          ...(data.title !== undefined ? { title: data.title } : {}),
+          ...(data.content !== undefined ? { content: data.content } : {}),
+          ...(data.version !== undefined ? { version: data.version } : {}),
+          ...(data.status !== undefined ? { status: data.status } : {}),
+          processId,
+        },
+        include,
+      });
+    },
     remove: async (id: string) => {
       await prisma.procedure.delete({ where: { id } });
     },

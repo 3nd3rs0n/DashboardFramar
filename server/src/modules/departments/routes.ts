@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { registerCrud } from '../../lib/crud.js';
+import { crudController } from '../../lib/controller.js';
 import {
   createDepartmentBody,
   listDepartmentsQuery,
@@ -8,7 +8,8 @@ import {
 import { departmentService } from './service.js';
 
 export const departmentRoutes: FastifyPluginAsync = async (app) => {
-  registerCrud(app, {
+  crudController({
+    app,
     entity: 'Department',
     tag: 'departments',
     listQuery: listDepartmentsQuery,
