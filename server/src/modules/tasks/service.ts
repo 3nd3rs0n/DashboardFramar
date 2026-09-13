@@ -3,8 +3,12 @@ import { createdAtRange, pageArgs } from '../../lib/pagination.js';
 import type { CreateTaskBody, ListTasksQuery, UpdateTaskBody } from './schemas.js';
 
 const include = {
-  action: { select: { id: true, title: true } },
-  process: { include: { department: true } },
+  department: true,
+  comments: {
+    where: { user: { role: { not: 'ADMIN' } } },
+    select: { id: true },
+    take: 1,
+  },
 } satisfies Prisma.TaskInclude;
 
 export function taskService(prisma: PrismaClient) {
@@ -15,23 +19,24 @@ export function taskService(prisma: PrismaClient) {
           ? {
               OR: [
                 { title: { contains: q.search, mode: 'insensitive' } },
-                { description: { contains: q.search, mode: 'insensitive' } },
               ],
             }
           : {}),
         ...(q.status ? { status: q.status } : {}),
         ...(q.priority ? { priority: q.priority } : {}),
-        ...(q.actionId ? { actionId: q.actionId } : {}),
-        ...(q.processId ? { processId: q.processId } : {}),
-        ...(q.departmentId ? { process: { departmentId: q.departmentId } } : {}),
+        ...(q.departmentId ? { departmentId: q.departmentId } : {}),
         ...(q.responsibleId ? { responsibleId: q.responsibleId } : {}),
         ...createdAtRange(q),
       };
-      const [data, total] = await Promise.all([
+      const [data, total, pending, inProgress, done, cancelled] = await Promise.all([
         prisma.task.findMany({ where, include, ...pageArgs(q), orderBy: { createdAt: 'desc' } }),
         prisma.task.count({ where }),
+        prisma.task.count({ where: { ...where, status: 'PENDING' } }),
+        prisma.task.count({ where: { ...where, status: 'IN_PROGRESS' } }),
+        prisma.task.count({ where: { ...where, status: 'DONE' } }),
+        prisma.task.count({ where: { ...where, status: 'CANCELLED' } }),
       ]);
-      return { data, total };
+      return { data, total, counts: { pending, inProgress, done, cancelled } };
     },
     get: (id: string) => prisma.task.findUnique({ where: { id }, include }),
     create: (data: CreateTaskBody) => prisma.task.create({ data, include }),

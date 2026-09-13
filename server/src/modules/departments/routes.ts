@@ -16,5 +16,6 @@ export const departmentRoutes: FastifyPluginAsync = async (app) => {
     createBody: createDepartmentBody,
     updateBody: updateDepartmentBody,
     service: departmentService(app.prisma),
+    removeConflictMessage: 'No se puede eliminar el departamento porque tiene procesos, tareas u otros registros asociados. Elimine o reasigne esos registros primero.',
   });
 };

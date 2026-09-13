@@ -19,6 +19,7 @@ const STATUS_STYLES: Record<string, string> = {
   ACTION_DEFINED: 'bg-indigo-100 text-indigo-800 border-indigo-200',
   IN_EXECUTION: 'bg-indigo-100 text-indigo-800 border-indigo-200',
   IN_PROGRESS: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  COMPLETED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   PENDING_VERIFICATION: 'bg-cyan-100 text-cyan-800 border-cyan-200',
   MONITORED: 'bg-cyan-100 text-cyan-800 border-cyan-200',
   // Warning / critical

@@ -30,42 +30,6 @@ enum FindingStatus {
   REOPENED
 }
 
-enum NonConformityStatus {
-  OPEN
-  IN_TREATMENT
-  CLOSED
-}
-
-enum RiskStatus {
-  IDENTIFIED
-  ASSESSED
-  IN_TREATMENT
-  MONITORED
-  CLOSED
-}
-
-enum OpportunityStatus {
-  IDENTIFIED
-  EVALUATED
-  IN_PROGRESS
-  IMPLEMENTED
-  CLOSED
-}
-
-enum ActionType {
-  CORRECTIVE
-  PREVENTIVE
-  IMPROVEMENT
-}
-
-enum ActionStatus {
-  PENDING
-  IN_PROGRESS
-  DONE
-  VERIFIED
-  CANCELLED
-}
-
 enum TaskStatus {
   PENDING
   IN_PROGRESS
@@ -89,214 +53,166 @@ enum KpiFrequency {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  name         String
-  passwordHash String
-  role         Role       @default(ANALYST)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  activities   Activity[]
-  auditLogs    AuditLog[]
+  id                    String               @id @default(cuid())
+  email                 String               @unique
+  name                  String
+  passwordHash          String
+  role                  Role                 @default(ANALYST)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  auditLogs             AuditLog[]
+  taskComments          TaskComment[]
+  findingComments       FindingComment[]
+  findingParticipations FindingParticipant[]
+  procedureComments     ProcedureComment[]
 }
 
 model Department {
-  id          String         @id @default(cuid())
-  name        String         @unique
-  description String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  processes   Process[]
-  activities  Activity[]
+  id              String           @id @default(cuid())
+  name            String           @unique
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  processes       Process[]
+  tasks           Task[]
+  bonusFindings   BonusFinding[]
+  bonusProcedures BonusProcedure[]
 }
 
 model Process {
-  id              String          @id @default(cuid())
+  id              String           @id @default(cuid())
   name            String
   description     String?
   departmentId    String
-  department      Department      @relation(fields: [departmentId], references: [id])
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  department      Department       @relation(fields: [departmentId], references: [id])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   procedures      Procedure[]
   findings        Finding[]
-  nonConformities NonConformity[]
-  risks           Risk[]
-  opportunities   Opportunity[]
-  tasks           Task[]
-  activities      Activity[]
   kpis            Kpi[]
+  bonusProcedures BonusProcedure[]
 
   @@unique([departmentId, name])
   @@index([departmentId])
 }
 
 model Procedure {
-  id          String          @id @default(cuid())
-  code        String?
-  title       String
-  content     String?
-  version     String          @default("1.0")
-  status      ProcedureStatus @default(DRAFT)
-  processId   String
-  process     Process         @relation(fields: [processId], references: [id])
-  file        File?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id        String             @id @default(cuid())
+  code      String?
+  title     String
+  content   String?
+  version   String             @default("1.0")
+  status    ProcedureStatus    @default(DRAFT)
+  dueDate   DateTime?
+  processId String
+  process   Process            @relation(fields: [processId], references: [id])
+  file      File?
+  comments  ProcedureComment[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
   @@index([processId])
 }
 
+model ProcedureComment {
+  id          String    @id @default(cuid())
+  body        String
+  procedureId String
+  procedure   Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([procedureId, createdAt])
+}
+
 model File {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   filename    String
   mimetype    String
   size        Int
   data        Bytes
-  procedureId String   @unique
-  procedure   Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  procedureId String?    @unique
+  procedure   Procedure? @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+  findingId   String?    @unique
+  finding     Finding?   @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
 }
 
 model Finding {
-  id            String        @id @default(cuid())
-  code          String?       @unique
-  title         String
-  description   String?
-  type          String        @default("AUDIT")
-  priority      Priority      @default(MEDIUM)
-  status        FindingStatus @default(OPEN)
-  cause         String?
-  evidence      String?
-  dueDate       DateTime?
-  closedAt      DateTime?
-  processId     String
-  process       Process       @relation(fields: [processId], references: [id])
-  responsibleId String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  actions       Action[]
+  id           String               @id @default(cuid())
+  code         String?              @unique
+  title        String
+  type         String               @default("AUDIT")
+  priority     Priority             @default(MEDIUM)
+  status       FindingStatus        @default(OPEN)
+  dueDate      DateTime?
+  closedAt     DateTime?
+  processId    String
+  process      Process              @relation(fields: [processId], references: [id])
+  file         File?
+  comments     FindingComment[]
+  participants FindingParticipant[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
   @@index([processId])
   @@index([status])
 }
 
-model NonConformity {
-  id            String             @id @default(cuid())
-  code          String?            @unique
-  title         String
-  description   String?
-  requirement   String?
-  status        NonConformityStatus @default(OPEN)
-  processId     String
-  process       Process            @relation(fields: [processId], references: [id])
-  responsibleId String?
-  detectedAt    DateTime           @default(now())
-  closedAt      DateTime?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  actions       Action[]
+model FindingParticipant {
+  findingId String
+  finding   Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
-  @@index([processId])
-  @@index([status])
+  @@id([findingId, userId])
+  @@index([userId])
 }
 
-model Risk {
-  id            String     @id @default(cuid())
-  title         String
-  description   String?
-  probability   Int        @default(1)
-  impact        Int        @default(1)
-  level         Int        @default(1)
-  status        RiskStatus @default(IDENTIFIED)
-  mitigation    String?
-  processId     String
-  process       Process    @relation(fields: [processId], references: [id])
-  responsibleId String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  actions       Action[]
+model FindingComment {
+  id        String   @id @default(cuid())
+  body      String
+  findingId String
+  finding   Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([processId])
-  @@index([status])
-}
-
-model Opportunity {
-  id            String            @id @default(cuid())
-  title         String
-  description   String?
-  benefit       String?
-  status        OpportunityStatus @default(IDENTIFIED)
-  processId     String
-  process       Process           @relation(fields: [processId], references: [id])
-  responsibleId String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  actions       Action[]
-
-  @@index([processId])
-  @@index([status])
-}
-
-model Action {
-  id               String         @id @default(cuid())
-  title            String
-  description      String?
-  type             ActionType     @default(CORRECTIVE)
-  status           ActionStatus   @default(PENDING)
-  dueDate          DateTime?
-  completedAt      DateTime?
-  findingId        String?
-  finding          Finding?       @relation(fields: [findingId], references: [id])
-  nonConformityId  String?
-  nonConformity    NonConformity? @relation(fields: [nonConformityId], references: [id])
-  riskId           String?
-  risk             Risk?          @relation(fields: [riskId], references: [id])
-  opportunityId    String?
-  opportunity      Opportunity?   @relation(fields: [opportunityId], references: [id])
-  responsibleId    String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  tasks            Task[]
-
-  @@index([status])
+  @@index([findingId, createdAt])
 }
 
 model Task {
-  id            String     @id @default(cuid())
+  id            String        @id @default(cuid())
   title         String
-  description   String?
-  status        TaskStatus @default(PENDING)
-  priority      Priority   @default(MEDIUM)
+  status        TaskStatus    @default(PENDING)
+  priority      Priority      @default(MEDIUM)
   dueDate       DateTime?
   completedAt   DateTime?
-  actionId      String?
-  action        Action?    @relation(fields: [actionId], references: [id])
-  processId     String?
-  process       Process?   @relation(fields: [processId], references: [id])
+  departmentId  String?
+  department    Department?   @relation(fields: [departmentId], references: [id])
   responsibleId String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  comments      TaskComment[]
 
   @@index([status])
-  @@index([actionId])
 }
 
-model Activity {
-  id           String      @id @default(cuid())
-  title        String
-  description  String?
-  date         DateTime    @default(now())
-  processId    String?
-  process      Process?    @relation(fields: [processId], references: [id])
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id])
-  userId       String
-  user         User        @relation(fields: [userId], references: [id])
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+model TaskComment {
+  id        String   @id @default(cuid())
+  body      String
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([date])
+  @@index([taskId, createdAt])
 }
 
 model Kpi {
@@ -327,6 +243,98 @@ model KpiValue {
   createdAt DateTime @default(now())
 
   @@unique([kpiId, period])
+}
+
+model BonusKpiConfig {
+  id          String              @id @default(cuid())
+  key         String              @unique
+  name        String
+  description String
+  maxPoints   Int
+  thresholds  BonusKpiThreshold[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model BonusKpiThreshold {
+  id        String         @id @default(cuid())
+  configId  String
+  config    BonusKpiConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  minCount  Int
+  points    Int
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([configId, minCount])
+  @@index([configId])
+}
+
+model BonusFinding {
+  id             String                   @id @default(cuid())
+  detectionDate  DateTime                 @default(now())
+  departmentId   String
+  department     Department               @relation(fields: [departmentId], references: [id])
+  description    String
+  cause          String?
+  impact         String?
+  responsibleId  String?
+  proposedAction String?
+  status         String                   @default("OPEN")
+  closeDate      DateTime?
+  evidence       String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  actions        BonusImprovementAction[]
+
+  @@index([detectionDate])
+  @@index([departmentId])
+}
+
+model BonusImprovementAction {
+  id              String        @id @default(cuid())
+  findingId       String?
+  finding         BonusFinding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  action          String
+  responsibleId   String?
+  committedDate   DateTime?
+  closeDate       DateTime?
+  status          String        @default("OPEN")
+  evidence        String?
+  result          String?
+  indicatorBefore String?
+  indicatorAfter  String?
+  resultValidated Boolean       @default(false)
+  validatedById   String?
+  validatedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([closeDate])
+  @@index([status])
+}
+
+model BonusProcedure {
+  id                 String     @id @default(cuid())
+  name               String
+  departmentId       String
+  department         Department @relation(fields: [departmentId], references: [id])
+  processId          String
+  process            Process    @relation(fields: [processId], references: [id])
+  identificationDate DateTime   @default(now())
+  responsibleId      String?
+  analysisStatus     String     @default("PENDING")
+  draftingStatus     String     @default("PENDING")
+  validationStatus   String     @default("PENDING")
+  approvalDate       DateTime?
+  diffusionDate      DateTime?
+  version            String     @default("1.0")
+  evidence           String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@index([identificationDate])
+  @@index([departmentId])
+  @@index([processId])
 }
 
 model AuditLog {

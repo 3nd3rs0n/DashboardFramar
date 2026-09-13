@@ -16,21 +16,6 @@ export const FINDING_STATUSES = [
 ] as const
 export type FindingStatus = (typeof FINDING_STATUSES)[number]
 
-export const NON_CONFORMITY_STATUSES = ['OPEN', 'IN_TREATMENT', 'CLOSED'] as const
-export type NonConformityStatus = (typeof NON_CONFORMITY_STATUSES)[number]
-
-export const RISK_STATUSES = ['IDENTIFIED', 'ASSESSED', 'IN_TREATMENT', 'MONITORED', 'CLOSED'] as const
-export type RiskStatus = (typeof RISK_STATUSES)[number]
-
-export const OPPORTUNITY_STATUSES = ['IDENTIFIED', 'EVALUATED', 'IN_PROGRESS', 'IMPLEMENTED', 'CLOSED'] as const
-export type OpportunityStatus = (typeof OPPORTUNITY_STATUSES)[number]
-
-export const ACTION_TYPES = ['CORRECTIVE', 'PREVENTIVE', 'IMPROVEMENT'] as const
-export type ActionType = (typeof ACTION_TYPES)[number]
-
-export const ACTION_STATUSES = ['PENDING', 'IN_PROGRESS', 'DONE', 'VERIFIED', 'CANCELLED'] as const
-export type ActionStatus = (typeof ACTION_STATUSES)[number]
-
 export const TASK_STATUSES = ['PENDING', 'IN_PROGRESS', 'DONE', 'CANCELLED'] as const
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 
@@ -81,10 +66,28 @@ export interface Procedure {
   content: string | null
   version: string
   status: ProcedureStatus
+  dueDate: string | null
   processId: string
   process?: Process
   file?: ProcedureFile | null
+  comments?: { id: string }[]
   createdAt: string
+}
+
+export interface ProcedureHistoryEntry {
+  id: string
+  action: 'CREATE' | 'UPDATE' | 'DELETE'
+  changes: unknown
+  createdAt: string
+  user: TaskUser | null
+}
+
+export interface ProcedureComment {
+  id: string
+  body: string
+  createdAt: string
+  updatedAt: string
+  user: TaskUser
 }
 
 interface Base {
@@ -100,54 +103,35 @@ export interface Finding extends Base {
   type: string
   priority: Priority
   status: FindingStatus
-  cause: string | null
-  evidence: string | null
   dueDate: string | null
   closedAt: string | null
   processId: string
   process?: Process
+  file?: ProcedureFile | null
+  comments?: { id: string }[]
 }
 
-export interface NonConformity extends Base {
-  code: string | null
-  requirement: string | null
-  status: NonConformityStatus
-  processId: string
-  process?: Process
-  detectedAt: string
-  closedAt: string | null
+export interface FindingHistoryEntry {
+  id: string
+  action: 'CREATE' | 'UPDATE' | 'DELETE'
+  changes: unknown
+  createdAt: string
+  user: TaskUser | null
 }
 
-export interface Risk extends Base {
-  probability: number
-  impact: number
-  level: number
-  status: RiskStatus
-  mitigation: string | null
-  processId: string
-  process?: Process
+export interface FindingComment {
+  id: string
+  body: string
+  createdAt: string
+  updatedAt: string
+  user: TaskUser
 }
 
-export interface Opportunity extends Base {
-  benefit: string | null
-  status: OpportunityStatus
-  processId: string
-  process?: Process
-}
-
-export interface AuditAction extends Base {
-  type: ActionType
-  status: ActionStatus
-  dueDate: string | null
-  completedAt: string | null
-  findingId: string | null
-  finding?: Finding | null
-  nonConformityId: string | null
-  nonConformity?: NonConformity | null
-  riskId: string | null
-  risk?: Risk | null
-  opportunityId: string | null
-  opportunity?: Opportunity | null
+export interface FindingParticipant {
+  findingId: string
+  userId: string
+  createdAt: string
+  user: User
 }
 
 export interface Task extends Base {
@@ -155,24 +139,31 @@ export interface Task extends Base {
   priority: Priority
   dueDate: string | null
   completedAt: string | null
-  actionId: string | null
-  action?: AuditAction | null
-  processId: string | null
-  process?: Process | null
-}
-
-export interface Activity {
-  id: string
-  title: string
-  description: string | null
-  date: string
-  processId: string | null
-  process?: Process | null
   departmentId: string | null
   department?: Department | null
-  userId: string
-  user?: User
+  comments?: { id: string }[]
+}
+
+export interface TaskUser {
+  id: string
+  name: string
+  email: string
+}
+
+export interface TaskHistoryEntry {
+  id: string
+  action: 'CREATE' | 'UPDATE' | 'DELETE'
+  changes: unknown
   createdAt: string
+  user: TaskUser | null
+}
+
+export interface TaskComment {
+  id: string
+  body: string
+  createdAt: string
+  updatedAt: string
+  user: TaskUser
 }
 
 export interface Kpi {
@@ -203,6 +194,12 @@ export interface KpiValue {
 export interface ListResponse<T> {
   data: T[]
   total: number
+  counts?: {
+    pending: number
+    inProgress: number
+    done: number
+    cancelled: number
+  }
 }
 
 export interface LoginResponse {
@@ -213,19 +210,125 @@ export interface LoginResponse {
 // Dashboard
 export interface DashboardSummary {
   findings: { total: number; open: number; overdue: number }
-  nonConformities: { total: number; open: number }
-  actions: { total: number; pending: number; overdue: number }
   tasks: { total: number; pending: number; overdue: number }
   procedures: { total: number; approved: number }
-  risks: { total: number; active: number; high: number }
-  opportunities: { total: number; open: number }
   kpis: { total: number; offTarget: number }
 }
 
 export interface DashboardCharts {
   findingsByMonth: { month: string; count: number }[]
   findingsByDepartment: { department: string; count: number }[]
+  proceduresByMonth: { month: string; DRAFT: number; IN_REVIEW: number; APPROVED: number; OBSOLETE: number }[]
   tasksByStatus: { status: string; count: number }[]
-  risksByLevel: { level: string; count: number }[]
   kpiCompliance: { kpi: string; target: number; latest: number; compliant: boolean }[]
+}
+
+export interface BonusThreshold {
+  minCount: number
+  points: number
+}
+
+export interface BonusKpiConfig {
+  id: string
+  key: string
+  name: string
+  description: string
+  maxPoints: number
+  thresholds: BonusThreshold[]
+}
+
+export interface BonusMetricResult {
+  key: string
+  name: string
+  count: number
+  score: number
+  maxPoints: number
+  progress: number
+  targetReached: BonusThreshold | null
+  nextTarget: BonusThreshold | null
+  missingForNext: number
+  traceability: {
+    recordIds: string[]
+    dataUsed: number
+    evidenceCount: number
+    calculation: string
+    score: number
+  }
+}
+
+export interface BonusHistoryPoint {
+  period: string
+  totalScore: number
+  kpis: { key: string; count: number; score: number }[]
+}
+
+export interface BonusDashboard {
+  year: number
+  month: number
+  period: string
+  kpis: BonusMetricResult[]
+  summary: {
+    currentScore: number
+    maxScore: number
+    compliance: number
+    performanceLevel: string
+  }
+  history: BonusHistoryPoint[]
+}
+
+export interface BonusFinding {
+  id: string
+  detectionDate: string
+  departmentId: string
+  department?: Department
+  description: string
+  cause: string | null
+  impact: string | null
+  responsibleId: string | null
+  proposedAction: string | null
+  status: string
+  closeDate: string | null
+  evidence: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BonusImprovementAction {
+  id: string
+  findingId: string | null
+  finding?: BonusFinding | null
+  action: string
+  responsibleId: string | null
+  committedDate: string | null
+  closeDate: string | null
+  status: string
+  evidence: string | null
+  result: string | null
+  indicatorBefore: string | null
+  indicatorAfter: string | null
+  resultValidated: boolean
+  validatedById: string | null
+  validatedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BonusProcedure {
+  id: string
+  name: string
+  departmentId: string
+  department?: Department
+  processId: string
+  process?: Process
+  identificationDate: string
+  responsibleId: string | null
+  analysisStatus: string
+  draftingStatus: string
+  validationStatus: string
+  approvalDate: string | null
+  diffusionDate: string | null
+  version: string
+  evidence: string | null
+  createdAt: string
+  updatedAt: string
 }

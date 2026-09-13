@@ -3,6 +3,7 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { logAudit } from '../../lib/audit.js';
 import { registerCrud } from '../../lib/crud.js';
 import { idParamsSchema } from '../../lib/pagination.js';
+import { allowMutation } from '../../lib/permissions.js';
 import {
   createKpiBody,
   createKpiValueBody,
@@ -44,6 +45,7 @@ export function kpiController(app: FastifyInstance) {
     '/:id/values',
     { schema: { params: idParamsSchema, body: createKpiValueBody, tags: ['kpis'] } },
     async (req, reply) => {
+      if (!allowMutation(req, reply)) return;
       if (!(await service.get(req.params.id))) {
         return reply
           .code(404)
@@ -65,6 +67,7 @@ export function kpiController(app: FastifyInstance) {
     '/:kpiId/values/:valueId',
     { schema: { params: kpiValueParamsSchema, tags: ['kpis'] } },
     async (req, reply) => {
+      if (!allowMutation(req, reply)) return;
       const existing = await service.getValue(req.params.valueId);
       if (!existing || existing.kpiId !== req.params.kpiId) {
         return reply

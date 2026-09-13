@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { crudController } from '../../lib/controller.js';
+import { procedureHistoryController } from './controller.js';
 import { createProcedureBody, listProceduresQuery, updateProcedureBody } from './schemas.js';
 import { procedureService } from './service.js';
 
@@ -13,4 +14,5 @@ export const procedureRoutes: FastifyPluginAsync = async (app) => {
     updateBody: updateProcedureBody,
     service: procedureService(app.prisma),
   });
+  procedureHistoryController(app);
 };

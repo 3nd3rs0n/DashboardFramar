@@ -1,21 +1,28 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { allowMutation } from '../../lib/permissions.js';
 import { fileService } from './service.js';
+
+const entityParamsSchema = z.object({
+  entityType: z.enum(['procedure', 'finding']),
+  entityId: z.string().min(1),
+});
 
 export function fileController(app: FastifyInstance) {
   const a = app.withTypeProvider<ZodTypeProvider>();
   const service = fileService(app.prisma);
 
   a.post(
-    '/upload/:procedureId',
+    '/upload/:entityType/:entityId',
     {
       schema: {
-        params: z.object({ procedureId: z.string().min(1) }),
+        params: entityParamsSchema,
         tags: ['files'],
       },
     },
     async (req, reply) => {
+      if (!allowMutation(req, reply)) return;
       const data = await req.file();
       if (!data) {
         return reply.code(400).send({ statusCode: 400, error: 'Bad Request', message: 'No file provided' });
@@ -28,7 +35,8 @@ export function fileController(app: FastifyInstance) {
       const fileBuffer = Buffer.concat(chunks);
 
       const file = await service.upload(
-        req.params.procedureId,
+        req.params.entityType,
+        req.params.entityId,
         data.filename,
         data.mimetype,
         fileBuffer.length,
@@ -46,15 +54,16 @@ export function fileController(app: FastifyInstance) {
   );
 
   a.get(
-    '/:procedureId',
+    '/:entityType/:entityId',
     {
       schema: {
-        params: z.object({ procedureId: z.string().min(1) }),
+        params: entityParamsSchema,
         tags: ['files'],
       },
     },
     async (req, reply) => {
-      const file = await service.getByProcedureId(req.params.procedureId);
+      if (!allowMutation(req, reply)) return;
+      const file = await service.getByEntity(req.params.entityType, req.params.entityId);
       if (!file) {
         return reply.code(404).send({ statusCode: 404, error: 'Not Found', message: 'File not found' });
       }
@@ -69,19 +78,19 @@ export function fileController(app: FastifyInstance) {
   );
 
   a.delete(
-    '/:procedureId',
+    '/:entityType/:entityId',
     {
       schema: {
-        params: z.object({ procedureId: z.string().min(1) }),
+        params: entityParamsSchema,
         tags: ['files'],
       },
     },
     async (req, reply) => {
-      const file = await service.getByProcedureId(req.params.procedureId);
+      const file = await service.getByEntity(req.params.entityType, req.params.entityId);
       if (!file) {
         return reply.code(404).send({ statusCode: 404, error: 'Not Found', message: 'File not found' });
       }
-      await service.delete(req.params.procedureId);
+      await service.deleteByEntity(req.params.entityType, req.params.entityId);
       return reply.code(204).send();
     },
   );
@@ -99,10 +108,10 @@ export function filePublicController(app: FastifyInstance) {
   };
 
   a.get(
-    '/download/:procedureId',
+    '/download/:entityType/:entityId',
     {
       schema: {
-        params: z.object({ procedureId: z.string().min(1) }),
+        params: entityParamsSchema,
         querystring: z.object({ token: z.string().optional() }),
         tags: ['files'],
         security: [],
@@ -110,7 +119,7 @@ export function filePublicController(app: FastifyInstance) {
       preHandler: [tokenFromQuery, app.authenticate],
     },
     async (req, reply) => {
-      const file = await service.getByProcedureId(req.params.procedureId);
+      const file = await service.getByEntity(req.params.entityType, req.params.entityId);
       if (!file) {
         return reply.code(404).send({ statusCode: 404, error: 'Not Found', message: 'File not found' });
       }
@@ -122,10 +131,10 @@ export function filePublicController(app: FastifyInstance) {
   );
 
   a.get(
-    '/view/:procedureId',
+    '/view/:entityType/:entityId',
     {
       schema: {
-        params: z.object({ procedureId: z.string().min(1) }),
+        params: entityParamsSchema,
         querystring: z.object({ token: z.string().optional() }),
         tags: ['files'],
         security: [],
@@ -133,7 +142,7 @@ export function filePublicController(app: FastifyInstance) {
       preHandler: [tokenFromQuery, app.authenticate],
     },
     async (req, reply) => {
-      const file = await service.getByProcedureId(req.params.procedureId);
+      const file = await service.getByEntity(req.params.entityType, req.params.entityId);
       if (!file) {
         return reply.code(404).send({ statusCode: 404, error: 'Not Found', message: 'File not found' });
       }

@@ -9,6 +9,11 @@ import type {
 const include = {
   process: { include: { department: true } },
   file: { select: { id: true, filename: true, mimetype: true, size: true, createdAt: true } },
+  comments: {
+    where: { user: { role: { not: 'ADMIN' } } },
+    select: { id: true },
+    take: 1,
+  },
 } satisfies Prisma.ProcedureInclude;
 
 async function findOrCreateProcess(
@@ -56,11 +61,12 @@ export function procedureService(prisma: PrismaClient) {
       return prisma.procedure.create({
         data: {
           code: data.code,
-          title: data.title,
-          content: data.content,
-          version: data.version,
-          status: data.status,
-          processId: process.id,
+           title: data.title,
+           content: data.content,
+           version: data.version,
+           status: data.status,
+           dueDate: data.dueDate,
+           processId: process.id,
         },
         include,
       });
@@ -89,6 +95,7 @@ export function procedureService(prisma: PrismaClient) {
           ...(data.content !== undefined ? { content: data.content } : {}),
           ...(data.version !== undefined ? { version: data.version } : {}),
           ...(data.status !== undefined ? { status: data.status } : {}),
+          ...(data.dueDate !== undefined ? { dueDate: data.dueDate } : {}),
           processId,
         },
         include,

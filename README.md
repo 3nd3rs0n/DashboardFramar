@@ -36,6 +36,7 @@ npm run dev                # http://localhost:5173
 ## Credenciales demo
 
 - `admin@example.com` / `Admin123!` (ADMIN)
+- `framar@framar.cl` / `MiClaveSegura123!` (VIEWER)
 
 ## Estructura
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useRelationOptions, type Option, type RelationKind } from '@/api/hooks'
+import { cn } from '@/lib/utils'
 
 export const ALL = '__all__'
 
@@ -18,6 +19,7 @@ interface FilterBarProps {
   values: Record<string, string>
   onChange: (name: string, value: string) => void
   searchPlaceholder?: string
+  className?: string
 }
 
 function RelationSelect({
@@ -48,7 +50,7 @@ function FilterSelect({
 }) {
   return (
     <Select value={value || ALL} onValueChange={onChange}>
-      <SelectTrigger className="w-full sm:w-52">
+      <SelectTrigger className="w-full" aria-label={placeholder}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -63,8 +65,12 @@ function FilterSelect({
   )
 }
 
-export function FilterBar({ filters, values, onChange, searchPlaceholder }: FilterBarProps) {
+export function FilterBar({ filters, values, onChange, searchPlaceholder, className }: FilterBarProps) {
   const [search, setSearch] = useState(values.search ?? '')
+
+  useEffect(() => {
+    setSearch(values.search ?? '')
+  }, [values.search])
 
   useEffect(() => {
     const timer = setTimeout(() => onChange('search', search), 300)
@@ -73,35 +79,39 @@ export function FilterBar({ filters, values, onChange, searchPlaceholder }: Filt
   }, [search])
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Input
-        className="w-full sm:w-64"
-        placeholder={searchPlaceholder ?? 'Buscar...'}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+    <div className={cn('flex flex-wrap items-end gap-3', className)}>
+      <div className="flex w-full flex-col gap-1 sm:w-64">
+        <span className="text-[11px] font-medium text-muted-foreground">Buscar</span>
+        <Input
+          placeholder={searchPlaceholder ?? 'Buscar...'}
+          aria-label={searchPlaceholder ?? 'Buscar'}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
       {filters.map((filter) => {
-        if (filter.type === 'date') {
-          return (
-            <Input
-              key={filter.name}
-              type="date"
-              className="w-full sm:w-40"
-              aria-label={filter.label}
-              value={values[filter.name] ?? ''}
-              onChange={(e) => onChange(filter.name, e.target.value)}
-            />
-          )
-        }
         const props = {
           value: values[filter.name] ?? '',
           onChange: (value: string) => onChange(filter.name, value === ALL ? '' : value),
           placeholder: filter.label,
         }
-        return filter.type === 'relation' && filter.relation ? (
-          <RelationSelect key={filter.name} relation={filter.relation} {...props} />
-        ) : (
-          <FilterSelect key={filter.name} options={filter.options ?? []} {...props} />
+
+        return (
+          <div key={filter.name} className="flex w-full flex-col gap-1 sm:w-52">
+            <span className="text-[11px] font-medium text-muted-foreground">{filter.label}</span>
+            {filter.type === 'date' ? (
+              <Input
+                type="date"
+                aria-label={filter.label}
+                value={values[filter.name] ?? ''}
+                onChange={(e) => onChange(filter.name, e.target.value)}
+              />
+            ) : filter.type === 'relation' && filter.relation ? (
+              <RelationSelect relation={filter.relation} {...props} />
+            ) : (
+              <FilterSelect options={filter.options ?? []} {...props} />
+            )}
+          </div>
         )
       })}
     </div>

@@ -1,4 +1,4 @@
-import { PrismaClient, type Priority, type FindingStatus, type ActionType, type KpiFrequency } from '@prisma/client'
+import { PrismaClient, type Priority, type FindingStatus, type KpiFrequency } from '@prisma/client'
 import { hash } from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -96,93 +96,21 @@ async function main() {
       },
     })
   }
+  await prisma.$executeRaw`
+    SELECT setval(
+      '"finding_code_seq"',
+      GREATEST(COALESCE((SELECT MAX((substring("code" FROM '^H-([0-9]+)$'))::bigint) FROM "Finding"), 1), 1),
+      (SELECT MAX((substring("code" FROM '^H-([0-9]+)$'))::bigint) FROM "Finding") IS NOT NULL
+    )
+  `
   console.log(`  Findings: ${findings.length}`)
-
-  // NonConformities
-  const ncs = [
-    { title: 'Documentos sin vigencia', process: 'Gestión documental' },
-    { title: 'Incumplimiento de política de seguridad', process: 'Infraestructura TI' },
-  ]
-  for (const nc of ncs) {
-    const existing = await prisma.nonConformity.findFirst({ where: { title: nc.title } })
-    if (!existing) {
-      await prisma.nonConformity.create({
-        data: { title: nc.title, status: 'OPEN', processId: processes[nc.process].id },
-      })
-    }
-  }
-  console.log(`  NonConformities: ${ncs.length}`)
-
-  // Risks
-  const risks = [
-    { title: 'Rotación de personal', probability: 4, impact: 3, process: 'Contratación' },
-    { title: 'Error en cálculo de nómina', probability: 2, impact: 5, process: 'Nómina' },
-    { title: 'Falla en infraestructura crítica', probability: 3, impact: 5, process: 'Infraestructura TI' },
-    { title: 'Incumplimiento regulatorio', probability: 2, impact: 4, process: 'Gestión de riesgos' },
-  ]
-  for (const r of risks) {
-    const existing = await prisma.risk.findFirst({ where: { title: r.title } })
-    if (!existing) {
-      await prisma.risk.create({
-        data: {
-          title: r.title,
-          probability: r.probability,
-          impact: r.impact,
-          level: r.probability * r.impact,
-          processId: processes[r.process].id,
-        },
-      })
-    }
-  }
-  console.log(`  Risks: ${risks.length}`)
-
-  // Opportunities
-  const opps = [
-    { title: 'Digitalización de proceso de selección', process: 'Contratación' },
-    { title: 'Automatización de cierre de nómina', process: 'Nómina' },
-    { title: 'Implementar sistema de ticketing TI', process: 'Infraestructura TI' },
-  ]
-  for (const o of opps) {
-    const existing = await prisma.opportunity.findFirst({ where: { title: o.title } })
-    if (!existing) {
-      await prisma.opportunity.create({
-        data: { title: o.title, processId: processes[o.process].id },
-      })
-    }
-  }
-  console.log(`  Opportunities: ${opps.length}`)
-
-  // Actions (linking to findings)
-  const allFindings = await prisma.finding.findMany({ where: { code: { in: ['H-001', 'H-003', 'H-005'] } } })
-  const findingMap = Object.fromEntries(allFindings.map((f) => [f.code!, f]))
-
-  const actions = [
-    { title: 'Elaborar instructivo de selección', type: 'CORRECTIVE', findingCode: 'H-001' },
-    { title: 'Implementar revisión trimestral', type: 'PREVENTIVE', findingCode: 'H-003' },
-    { title: 'Registrar historial de mantenimiento', type: 'CORRECTIVE', findingCode: 'H-005' },
-  ]
-  for (const a of actions) {
-    const existing = await prisma.action.findFirst({ where: { title: a.title } })
-    if (!existing) {
-      await prisma.action.create({
-        data: {
-          title: a.title,
-          type: a.type as ActionType,
-          status: 'PENDING',
-          findingId: findingMap[a.findingCode]?.id,
-          dueDate: new Date(2026, 9, 15),
-        },
-      })
-    }
-  }
-  console.log(`  Actions: ${actions.length}`)
 
   // Tasks
   const tasksData = [
-    { title: 'Redactar documento de procedimiento de selección', status: 'PENDING' as const, priority: 'HIGH' as const, processName: 'Contratación', dueDate: new Date(2026, 8, 20) },
-    { title: 'Revisar cálculos nómina julio', status: 'IN_PROGRESS' as const, priority: 'MEDIUM' as const, processName: 'Nómina', dueDate: new Date(2026, 8, 25) },
-    { title: 'Levantar inventario de activos TI', status: 'PENDING' as const, priority: 'HIGH' as const, processName: 'Infraestructura TI', dueDate: new Date(2026, 9, 1) },
-    { title: 'Actualizar matriz de riesgos', status: 'DONE' as const, priority: 'MEDIUM' as const, processName: 'Gestión de riesgos', dueDate: new Date(2026, 7, 15) },
+    { title: 'Redactar documento de procedimiento de selección', status: 'PENDING' as const, priority: 'HIGH' as const, departmentName: 'Recursos Humanos', dueDate: new Date(2026, 8, 20) },
+    { title: 'Revisar cálculos nómina julio', status: 'IN_PROGRESS' as const, priority: 'MEDIUM' as const, departmentName: 'Recursos Humanos', dueDate: new Date(2026, 8, 25) },
+    { title: 'Levantar inventario de activos TI', status: 'PENDING' as const, priority: 'HIGH' as const, departmentName: 'Tecnología / IT', dueDate: new Date(2026, 9, 1) },
+    { title: 'Actualizar matriz de riesgos', status: 'DONE' as const, priority: 'MEDIUM' as const, departmentName: 'Prevención de Riesgos', dueDate: new Date(2026, 7, 15) },
   ]
   for (const t of tasksData) {
     const existing = await prisma.task.findFirst({ where: { title: t.title } })
@@ -192,7 +120,7 @@ async function main() {
           title: t.title,
           status: t.status,
           priority: t.priority,
-          processId: processes[t.processName].id,
+          departmentId: depts[t.departmentName].id,
           dueDate: t.dueDate,
         },
       })
@@ -200,42 +128,16 @@ async function main() {
   }
   console.log(`  Tasks: ${tasksData.length}`)
 
-  // Activities
-  const activitiesData = [
-    { title: 'Visita a departamento de RRHH', date: new Date(2026, 7, 10), deptName: 'Recursos Humanos', processName: 'Contratación' },
-    { title: 'Revisión de documentación financiera', date: new Date(2026, 7, 11), deptName: 'Finanzas', processName: 'Presupuesto' },
-    { title: 'Inspección de infraestructura TI', date: new Date(2026, 7, 12), deptName: 'Tecnología / IT', processName: 'Infraestructura TI' },
-  ]
-  for (const a of activitiesData) {
-    const existing = await prisma.activity.findFirst({ where: { title: a.title } })
-    if (!existing) {
-      await prisma.activity.create({
-        data: {
-          title: a.title,
-          date: a.date,
-          departmentId: depts[a.deptName].id,
-          processId: processes[a.processName].id,
-          userId: admin.id,
-        },
-      })
-    }
-  }
-  console.log(`  Activities: ${activitiesData.length}`)
-
   // KPIs with values (6 months)
   const kpiDefs = [
-    { name: '% Acciones correctivas cerradas', unit: '%', target: 80, frequency: 'MONTHLY', process: 'Contratación', formula: 'cerradas / totales * 100' },
     { name: '% Hallazgos cerrados a tiempo', unit: '%', target: 90, frequency: 'MONTHLY', process: 'Nómina', formula: 'cerrados_a_tiempo / total * 100' },
     { name: 'Tareas completadas por semana', unit: 'uds', target: 10, frequency: 'WEEKLY', process: 'Producción', formula: 'completadas' },
-    { name: 'Riesgos mitigados', unit: '%', target: 70, frequency: 'QUARTERLY', process: 'Gestión de riesgos', formula: 'mitigados / total * 100' },
   ]
 
   const months = ['2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07']
   const kpiValues: Record<string, number[]> = {
-    '% Acciones correctivas cerradas': [65, 70, 72, 75, 78, 82],
     '% Hallazgos cerrados a tiempo': [80, 75, 85, 88, 90, 87],
     'Tareas completadas por semana': [8, 12, 9, 11, 10, 13],
-    'Riesgos mitigados': [50, 55, 60, 62, 65, 68],
   }
 
   for (const kd of kpiDefs) {
@@ -265,6 +167,55 @@ async function main() {
     }
   }
   console.log(`  KPIs: ${kpiDefs.length} (${months.length} values each)`)
+
+  // Bonus KPI configuration. Thresholds are stored as data so they can be changed without changing the engine.
+  const bonusConfigs = [
+    {
+      key: 'FINDINGS_MANAGEMENT',
+      name: 'Gestión de Hallazgos',
+      description: 'Hallazgos válidos registrados durante el mes.',
+      maxPoints: 3,
+      thresholds: [{ minCount: 0, points: 1 }, { minCount: 9, points: 2 }, { minCount: 11, points: 3 }],
+    },
+    {
+      key: 'CONTINUOUS_IMPROVEMENT',
+      name: 'Cierre de Acciones de Mejora Continua',
+      description: 'Acciones cerradas exitosamente con evidencia y resultado validado.',
+      maxPoints: 4,
+      thresholds: [{ minCount: 3, points: 1 }, { minCount: 5, points: 3 }, { minCount: 7, points: 4 }],
+    },
+    {
+      key: 'PROCEDURES_MANAGEMENT',
+      name: 'Gestión de Procedimientos',
+      description: 'Procedimientos que completaron todas las etapas del flujo.',
+      maxPoints: 3,
+      thresholds: [{ minCount: 0, points: 1 }, { minCount: 9, points: 2 }, { minCount: 11, points: 3 }],
+    },
+  ]
+  for (const configData of bonusConfigs) {
+    const config = await prisma.bonusKpiConfig.upsert({
+      where: { key: configData.key },
+      update: { name: configData.name, description: configData.description, maxPoints: configData.maxPoints },
+      create: { key: configData.key, name: configData.name, description: configData.description, maxPoints: configData.maxPoints },
+    })
+    if (configData.key === 'FINDINGS_MANAGEMENT') {
+      await prisma.bonusKpiThreshold.deleteMany({ where: { configId: config.id, minCount: { in: [8, 10, 12] } } })
+    }
+    if (configData.key === 'PROCEDURES_MANAGEMENT') {
+      await prisma.bonusKpiThreshold.deleteMany({ where: { configId: config.id, minCount: { in: [8, 10, 12] } } })
+    }
+    if (configData.key === 'CONTINUOUS_IMPROVEMENT') {
+      await prisma.bonusKpiThreshold.deleteMany({ where: { configId: config.id, minCount: { in: [4, 6, 8] } } })
+    }
+    for (const threshold of configData.thresholds) {
+      await prisma.bonusKpiThreshold.upsert({
+        where: { configId_minCount: { configId: config.id, minCount: threshold.minCount } },
+        update: { points: threshold.points },
+        create: { configId: config.id, minCount: threshold.minCount, points: threshold.points },
+      })
+    }
+  }
+  console.log(`  Bonus KPI configurations: ${bonusConfigs.length}`)
 
   console.log('Seed complete.')
 }

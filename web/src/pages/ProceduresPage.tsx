@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { z } from 'zod'
-import { Download, Eye, FileText, Trash2, Upload } from 'lucide-react'
+import { Download, Eye, FileText, History, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   ResourcePage,
   enumOptions,
+  optionalDate,
   optionalText,
   requiredText,
 } from '@/components/ResourcePage'
@@ -14,7 +15,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PROCEDURE_STATUSES, type Procedure } from '@/api/types'
 import { PROCEDURE_STATUS_LABELS } from '@/lib/labels'
-import { getToken } from '@/api/client'
+import { getApiBase, getToken } from '@/api/client'
+import { ProcedureHistoryDialog } from '@/components/ProcedureHistoryDialog'
+import { formatDate } from '@/lib/utils'
+import { useAuth } from '@/auth/AuthContext'
 
 const statusOptions = enumOptions(PROCEDURE_STATUSES, PROCEDURE_STATUS_LABELS)
 
@@ -25,7 +29,7 @@ const fields: FieldDef[] = [
   { name: 'status', label: 'Estado', type: 'select', options: statusOptions, required: true },
   { name: 'departmentId', label: 'Departamento', type: 'relation', relation: 'departments', required: true },
   { name: 'processName', label: 'Proceso', type: 'text', required: true, placeholder: 'Nombre del proceso' },
-  { name: 'content', label: 'Contenido', type: 'textarea' },
+  { name: 'dueDate', label: 'Fecha compromiso', type: 'date' },
 ]
 
 const schema = z.object({
@@ -35,7 +39,7 @@ const schema = z.object({
   status: requiredText('Seleccione un estado'),
   departmentId: requiredText('Seleccione un departamento'),
   processName: requiredText('Ingrese el nombre del proceso'),
-  content: optionalText(),
+  dueDate: optionalDate(),
 })
 
 function toFormValues(item: Procedure): Record<string, string> {
@@ -46,7 +50,7 @@ function toFormValues(item: Procedure): Record<string, string> {
     status: item.status,
     departmentId: item.process?.departmentId ?? NONE,
     processName: item.process?.name ?? '',
-    content: item.content ?? '',
+    dueDate: item.dueDate ? item.dueDate.slice(0, 10) : '',
   }
 }
 
@@ -63,7 +67,7 @@ function FileUploadButton({ procedureId, onUploaded }: { procedureId: string; on
       formData.append('file', file)
 
       const token = getToken()
-      const res = await fetch(`/api/files/upload/${procedureId}`, {
+      const res = await fetch(`${getApiBase()}/files/upload/procedure/${procedureId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -117,12 +121,14 @@ function FileViewerModal({
   procedureId,
   file,
   onDelete,
+  canDelete,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   procedureId: string
   file: { filename: string; mimetype: string; size: number }
   onDelete: () => void
+  canDelete: boolean
 }) {
   const isImage = /\.(png|jpg|jpeg|gif|webp)$/i.test(file.filename)
   const isPdf = /\.pdf$/i.test(file.filename)
@@ -140,14 +146,14 @@ function FileViewerModal({
         <div className="overflow-auto">
           {isImage && (
             <img
-              src={`/api/files/view/${procedureId}?token=${token}`}
+              src={`${getApiBase()}/files/view/procedure/${procedureId}?token=${token}`}
               alt={file.filename}
               className="max-w-full h-auto rounded"
             />
           )}
           {isPdf && (
             <iframe
-              src={`/api/files/view/${procedureId}?token=${token}`}
+              src={`${getApiBase()}/files/view/procedure/${procedureId}?token=${token}`}
               className="w-full h-[60vh] border rounded"
               title={file.filename}
             />
@@ -166,17 +172,19 @@ function FileViewerModal({
           )}
         </div>
         <div className="flex items-center justify-between border-t pt-4">
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onDelete}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Eliminar
-          </Button>
+           {canDelete && (
+             <Button
+               variant="destructive"
+               size="sm"
+               onClick={onDelete}
+             >
+               <Trash2 className="h-4 w-4 mr-2" />
+               Eliminar
+             </Button>
+           )}
           <Button
             onClick={() => {
-              window.open(`/api/files/download/${procedureId}?token=${token}`, '_blank')
+              window.open(`${getApiBase()}/files/download/procedure/${procedureId}?token=${token}`, '_blank')
             }}
           >
             <Download className="h-4 w-4 mr-2" />
@@ -189,16 +197,19 @@ function FileViewerModal({
 }
 
 function FileButtons({ procedure }: { procedure: Procedure }) {
+  const { user } = useAuth()
+  const canMutate = user?.role !== 'VIEWER'
   const [viewerOpen, setViewerOpen] = useState(false)
 
   if (!procedure.file) {
+    if (!canMutate) return <span className="text-xs text-muted-foreground italic">Sin archivo</span>
     return <FileUploadButton procedureId={procedure.id} onUploaded={() => window.location.reload()} />
   }
 
   function handleDownload() {
     const token = getToken()
     const link = document.createElement('a')
-    link.href = `/api/files/download/${procedure.id}?token=${token}`
+    link.href = `${getApiBase()}/files/download/procedure/${procedure.id}?token=${token}`
     link.download = procedure.file!.filename
     document.body.appendChild(link)
     link.click()
@@ -208,7 +219,7 @@ function FileButtons({ procedure }: { procedure: Procedure }) {
   async function handleDelete() {
     try {
       const token = getToken()
-      const res = await fetch(`/api/files/${procedure.id}`, {
+      const res = await fetch(`${getApiBase()}/files/procedure/${procedure.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -236,7 +247,31 @@ function FileButtons({ procedure }: { procedure: Procedure }) {
         procedureId={procedure.id}
         file={procedure.file}
         onDelete={handleDelete}
+        canDelete={canMutate}
       />
+    </>
+  )
+}
+
+function ProcedureHistoryButton({ procedure }: { procedure: Procedure }) {
+  const { user } = useAuth()
+  const [open, setOpen] = useState(false)
+  const showCommentAlert = user?.role === 'ADMIN' && Boolean(procedure.comments?.length)
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={showCommentAlert ? 'Hay comentarios nuevos en este procedimiento' : 'Ver historial de actividades'}
+        title={showCommentAlert ? 'Hay comentarios nuevos en este procedimiento' : 'Ver historial de actividades'}
+        className={showCommentAlert ? 'relative text-amber-600 hover:text-amber-700' : undefined}
+        onClick={() => setOpen(true)}
+      >
+        <History className="h-4 w-4" />
+        {showCommentAlert && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-card" />}
+      </Button>
+      {open && <ProcedureHistoryDialog procedure={procedure} open={open} onOpenChange={setOpen} />}
     </>
   )
 }
@@ -253,17 +288,19 @@ export function ProceduresPage() {
       searchPlaceholder="Buscar por código, título, departamento o proceso..."
       fields={fields}
       schema={schema}
-      defaultValues={{ code: '', title: '', version: '1.0', status: 'DRAFT', departmentId: NONE, processName: '', content: '' }}
+       defaultValues={{ code: '', title: '', version: '1.0', status: 'DRAFT', departmentId: NONE, processName: '', dueDate: '' }}
       toFormValues={toFormValues}
+      rowActions={(procedure) => <ProcedureHistoryButton procedure={procedure} />}
       filters={[
         { name: 'status', label: 'Filtrar por estado', type: 'select', options: statusOptions },
       ]}
       columns={[
         { header: 'Código', cell: (p) => p.code ?? '—' },
         { header: 'Título', cell: (p) => <span className="font-medium">{p.title}</span> },
-        { header: 'Departamento', cell: (p) => p.process?.department?.name ?? '—' },
-        { header: 'Proceso', cell: (p) => p.process?.name ?? '—' },
-        { header: 'Archivo', cell: (p) => p.file ? (
+         { header: 'Departamento', cell: (p) => p.process?.department?.name ?? '—' },
+         { header: 'Proceso', cell: (p) => p.process?.name ?? '—' },
+         { header: 'Creación', cell: (p) => formatDate(p.createdAt) },
+         { header: 'Archivo', cell: (p) => p.file ? (
           <span className="text-xs text-muted-foreground">{p.file.filename}</span>
         ) : (
           <span className="text-xs text-muted-foreground italic">Sin archivo</span>

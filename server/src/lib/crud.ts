@@ -3,6 +3,7 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { z } from 'zod';
 import { logAudit } from './audit.js';
 import { idParamsSchema } from './pagination.js';
+import { allowMutation } from './permissions.js';
 
 export interface CrudService<TList, TCreate, TUpdate, TItem extends { id: string }> {
   list(query: TList): Promise<{ data: TItem[]; total: number }>;
@@ -55,6 +56,7 @@ export function registerCrud<
   });
 
   a.post('/', { schema: { body: opts.createBody, tags: [opts.tag] } }, async (req, reply) => {
+    if (!allowMutation(req, reply)) return;
     const item = await service.create(parsed<SCreate>(req.body));
     await logAudit(app.prisma, {
       entity,
@@ -70,6 +72,7 @@ export function registerCrud<
     '/:id',
     { schema: { params: idParamsSchema, body: opts.updateBody, tags: [opts.tag] } },
     async (req, reply) => {
+      if (!allowMutation(req, reply)) return;
       if (!(await service.get(req.params.id))) return notFound(reply, entity);
       const item = await service.update(req.params.id, parsed<SUpdate>(req.body));
       await logAudit(app.prisma, {
@@ -84,6 +87,7 @@ export function registerCrud<
   );
 
   a.delete('/:id', { schema: { params: idParamsSchema, tags: [opts.tag] } }, async (req, reply) => {
+    if (!allowMutation(req, reply)) return;
     if (!(await service.get(req.params.id))) return notFound(reply, entity);
     await service.remove(req.params.id);
     await logAudit(app.prisma, {

@@ -8,12 +8,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { DepartmentsPage } from '@/pages/DepartmentsPage'
 import { ProceduresPage } from '@/pages/ProceduresPage'
 import { FindingsPage } from '@/pages/FindingsPage'
-import { NonConformitiesPage } from '@/pages/NonConformitiesPage'
-import { RisksPage } from '@/pages/RisksPage'
-import { OpportunitiesPage } from '@/pages/OpportunitiesPage'
-import { ActionsPage } from '@/pages/ActionsPage'
 import { TasksPage } from '@/pages/TasksPage'
-import { ActivitiesPage } from '@/pages/ActivitiesPage'
 import { KpisPage } from '@/pages/KpisPage'
 import { UsersPage } from '@/pages/UsersPage'
 import { SettingsPage } from '@/pages/SettingsPage'
@@ -40,13 +35,9 @@ export default function App() {
               <Route path="/departments" element={<DepartmentsPage />} />
               <Route path="/procedures" element={<ProceduresPage />} />
               <Route path="/findings" element={<FindingsPage />} />
-              <Route path="/non-conformities" element={<NonConformitiesPage />} />
-              <Route path="/risks" element={<RisksPage />} />
-              <Route path="/opportunities" element={<OpportunitiesPage />} />
-              <Route path="/actions" element={<ActionsPage />} />
               <Route path="/tasks" element={<TasksPage />} />
-              <Route path="/activities" element={<ActivitiesPage />} />
               <Route path="/kpis" element={<KpisPage />} />
+              <Route path="/bonus-kpis" element={<Navigate to="/kpis" replace />} />
               <Route
                 path="/users"
                 element={

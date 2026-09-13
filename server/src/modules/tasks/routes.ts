@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { crudController } from '../../lib/controller.js';
+import { taskCollaborationController } from './controller.js';
 import { createTaskBody, listTasksQuery, updateTaskBody } from './schemas.js';
 import { taskService } from './service.js';
 
@@ -13,4 +14,5 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     updateBody: updateTaskBody,
     service: taskService(app.prisma),
   });
+  taskCollaborationController(app);
 };

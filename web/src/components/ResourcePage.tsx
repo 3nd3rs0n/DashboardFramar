@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -14,6 +14,7 @@ import { FilterBar, ALL, type FilterDef } from '@/components/FilterBar'
 import { Loading } from '@/components/Loading'
 import { PageHeader } from '@/components/PageHeader'
 import { useCreate, useDelete, useList, useUpdate } from '@/api/hooks'
+import { useAuth } from '@/auth/AuthContext'
 
 // Shared zod helpers: all form values are strings; conversion happens in toPayload.
 export const requiredText = (msg = 'Campo obligatorio') => z.string().min(1, msg)
@@ -77,9 +78,12 @@ export interface ResourcePageConfig<T extends { id: string }> {
   emptyMessage: string
   toFormValues?: (item: T) => Record<string, string>
   toPayload?: (values: Record<string, string>) => Record<string, unknown>
+  rowActions?: (item: T) => ReactNode
 }
 
 export function ResourcePage<T extends { id: string }>(config: ResourcePageConfig<T>) {
+  const { user } = useAuth()
+  const canMutate = user?.role !== 'VIEWER'
   const [page, setPage] = useState(1)
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -144,21 +148,26 @@ export function ResourcePage<T extends { id: string }>(config: ResourcePageConfi
 
   const actionColumn: Column<T> = {
     header: '',
-    className: 'w-24 text-right',
+    className: config.rowActions ? 'w-36 text-right' : 'w-24 text-right',
     cell: (row) => (
       <div className="flex justify-end gap-1">
-        <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => openEdit(row)}>
-          <Pencil />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Eliminar"
-          className="text-destructive hover:text-destructive"
-          onClick={() => setDeleting(row)}
-        >
-          <Trash2 />
-        </Button>
+        {config.rowActions?.(row)}
+        {canMutate && (
+          <>
+            <Button variant="ghost" size="icon" aria-label="Editar" onClick={() => openEdit(row)}>
+              <Pencil />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Eliminar"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setDeleting(row)}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        )}
       </div>
     ),
   }
@@ -172,11 +181,11 @@ export function ResourcePage<T extends { id: string }>(config: ResourcePageConfi
       <PageHeader
         title={config.title}
         description={config.description}
-        action={
+        action={canMutate ? (
           <Button onClick={openCreate}>
             <Plus /> {config.createLabel}
           </Button>
-        }
+        ) : undefined}
       />
       <FilterBar
         filters={config.filters ?? []}
@@ -222,23 +231,27 @@ export function ResourcePage<T extends { id: string }>(config: ResourcePageConfi
         </>
       )}
 
-      <EntityFormDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        title={editing ? `Editar ${config.entityLabel}` : config.createLabel}
-        fields={config.fields}
-        form={form}
-        onSubmit={onSubmit}
-        isSubmitting={createMutation.isPending || updateMutation.isPending}
-      />
-      <ConfirmDialog
-        open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
-        title={`Eliminar ${config.entityLabel}`}
-        description="Esta acción no se puede deshacer. ¿Desea continuar?"
-        onConfirm={onDelete}
-        isLoading={deleteMutation.isPending}
-      />
+      {canMutate && (
+        <>
+          <EntityFormDialog
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            title={editing ? `Editar ${config.entityLabel}` : config.createLabel}
+            fields={config.fields}
+            form={form}
+            onSubmit={onSubmit}
+            isSubmitting={createMutation.isPending || updateMutation.isPending}
+          />
+          <ConfirmDialog
+            open={deleting !== null}
+            onOpenChange={(open) => !open && setDeleting(null)}
+            title={`Eliminar ${config.entityLabel}`}
+            description="Esta acción no se puede deshacer. ¿Desea continuar?"
+            onConfirm={onDelete}
+            isLoading={deleteMutation.isPending}
+          />
+        </>
+      )}
     </div>
   )
 }
