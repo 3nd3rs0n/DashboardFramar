@@ -27,7 +27,10 @@ export async function buildApp() {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  await app.register(cors, { origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173' });
+  await app.register(cors, {
+    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
   await app.register(multipart);
   await app.register(swagger, {
     openapi: {
