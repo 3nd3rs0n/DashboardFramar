@@ -15,6 +15,20 @@ async function main() {
   })
   console.log(`  User: ${admin.email}`)
 
+  // Demo viewer user. The environment variable lets production rotate this password.
+  const viewerPasswordHash = await hash(process.env.VIEWER_PASSWORD ?? 'MiClaveSegura123!', 10)
+  const viewer = await prisma.user.upsert({
+    where: { email: 'framar@framar.cl' },
+    update: { name: 'Framar Viewer', passwordHash: viewerPasswordHash, role: 'VIEWER' },
+    create: {
+      email: 'framar@framar.cl',
+      name: 'Framar Viewer',
+      passwordHash: viewerPasswordHash,
+      role: 'VIEWER',
+    },
+  })
+  console.log(`  User: ${viewer.email}`)
+
   // Departments
   const deptNames = [
     'Recursos Humanos',
